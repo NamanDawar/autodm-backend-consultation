@@ -75,7 +75,7 @@ router.post('/verify', async (req, res) => {
     }
 
     // Generate Google Meet link (simple unique link)
-    const meetLink = `https://meet.google.com/${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 5)}`;
+    const chars = "abcdefghijklmnopqrstuvwxyz"; const rand = (n) => Array.from({length:n}, () => chars[Math.floor(Math.random()*chars.length)]).join(""); const meetLink = `https://meet.google.com/${rand(4)}-${rand(4)}-${rand(4)}`;
 
     // Update booking to confirmed
     const bookingResult = await pool.query(
