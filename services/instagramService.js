@@ -80,9 +80,6 @@ async function subscribePageWebhook(pageId, pageAccessToken) {
         'messages',
         'messaging_postbacks',
         'message_echoes',
-        'messaging_seen',
-        'comments',
-        'mention',
       ],
     },
     { params: { access_token: pageAccessToken } }
