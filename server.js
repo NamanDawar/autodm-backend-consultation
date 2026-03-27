@@ -17,6 +17,7 @@ app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api/public', require('./routes/public'));
+app.use('/api/instagram', require('./routes/instagram'));
 
 app.get('/', (req, res) => {
   res.json({ status: 'AutoDM Consultation API running!' });
