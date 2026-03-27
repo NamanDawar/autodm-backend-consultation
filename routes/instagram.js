@@ -177,7 +177,8 @@ router.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 
   const body = req.body;
-  if (body.object !== 'instagram') return;
+  // Meta sends object='instagram' for IG-scoped webhooks or object='page' for page-based
+  if (body.object !== 'instagram' && body.object !== 'page') return;
 
   for (const entry of body.entry || []) {
     for (const event of entry.messaging || []) {
