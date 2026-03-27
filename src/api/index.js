@@ -42,4 +42,23 @@ export const verifyPayment = (data) => API.post('/payments/verify', data);
 // Public
 export const getPublicPage = (slug) => API.get(`/public/${slug}`);
 
+// ─── Instagram DM Automation ─────────────────────────────────
+// Account
+export const connectInstagram   = ()     => API.get('/instagram/connect');
+export const getIGAccount       = ()     => API.get('/instagram/account');
+export const disconnectInstagram = ()    => API.delete('/instagram/disconnect');
+
+// Stats
+export const getIGStats         = ()     => API.get('/instagram/stats');
+
+// Automations
+export const getIGAutomations   = ()     => API.get('/instagram/automations');
+export const createAutomation   = (data) => API.post('/instagram/automations', data);
+export const updateAutomation   = (id, data) => API.put(`/instagram/automations/${id}`, data);
+export const toggleAutomation   = (id)   => API.patch(`/instagram/automations/${id}/toggle`);
+export const deleteAutomation   = (id)   => API.delete(`/instagram/automations/${id}`);
+
+// Subscribers
+export const getIGSubscribers   = ()     => API.get('/instagram/subscribers');
+
 export default API;

@@ -8,6 +8,7 @@ import Services from './pages/Services';
 import Bookings from './pages/Bookings';
 import MyPage from './pages/MyPage';
 import PublicPage from './pages/PublicPage';
+import Automation from './pages/Automation';
 
 const ProtectedRoute = ({ children }) => {
   const { creator, loading } = useAuth();
@@ -22,6 +23,7 @@ const AppRoutes = () => {
       <Route path="/login" element={!creator ? <Login /> : <Navigate to="/dashboard" />} />
       <Route path="/signup" element={!creator ? <Signup /> : <Navigate to="/dashboard" />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/automations" element={<ProtectedRoute><Automation /></ProtectedRoute>} />
       <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
       <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
       <Route path="/my-page" element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
