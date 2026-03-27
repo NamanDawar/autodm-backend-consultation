@@ -160,15 +160,7 @@ router.get('/webhook', (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  console.log('🔍 Webhook verify attempt:', {
-    mode,
-    receivedToken: token,
-    expectedToken: process.env.META_WEBHOOK_VERIFY_TOKEN,
-    match: token === process.env.META_WEBHOOK_VERIFY_TOKEN,
-  });
-
   if (mode === 'subscribe' && token === process.env.META_WEBHOOK_VERIFY_TOKEN) {
-    console.log('✅ Webhook verified by Meta');
     res.status(200).send(challenge);
   } else {
     res.sendStatus(403);

@@ -1,8 +1,24 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
+
+// ─── Run DB migrations on startup ────────────────────────────
+(async () => {
+  try {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const schema = fs.readFileSync(path.join(__dirname, 'db', 'schema.sql'), 'utf8');
+    await pool.query(schema);
+    await pool.end();
+    console.log('✅ DB migrations applied');
+  } catch (err) {
+    console.error('⚠️  Migration error (non-fatal):', err.message);
+  }
+})();
 
 app.use(cors({
   origin: ['https://frontend-sage-two-97.vercel.app', 'http://localhost:5174', 'http://localhost:5173'],
