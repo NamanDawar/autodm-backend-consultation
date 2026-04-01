@@ -177,7 +177,10 @@ router.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 
   const body = req.body;
-  if (body.object !== 'instagram') return;
+  console.log('📨 Webhook received:', JSON.stringify(body).slice(0, 500));
+
+  // Handle both instagram and page object types
+  if (body.object !== 'instagram' && body.object !== 'page') return;
 
   for (const entry of body.entry || []) {
     for (const event of entry.messaging || []) {
@@ -185,8 +188,10 @@ router.post('/webhook', async (req, res) => {
       if (event.message?.is_echo) continue;
 
       const senderIgsid = event.sender?.id;   // sender's IGSID
-      const recipientId = event.recipient?.id; // our IG Business User ID
+      const recipientId = event.recipient?.id; // our IG Business User ID or Page ID
       const messageText = event.message?.text;
+
+      console.log(`📩 Message from ${senderIgsid} to ${recipientId}: "${messageText}"`);
 
       if (!messageText || !senderIgsid) continue;
 
@@ -203,14 +208,26 @@ router.post('/webhook', async (req, res) => {
  * Core automation engine — called for each inbound DM
  */
 async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText) {
-  // 1. Find the instagram_account record in DB
-  const acctResult = await pool.query(
+  // 1. Find the instagram_account record in DB — try ig_user_id first, then page_id
+  let acctResult = await pool.query(
     `SELECT ia.*, c.page_slug FROM instagram_accounts ia
      JOIN creators c ON c.id = ia.creator_id
      WHERE ia.ig_user_id = $1 AND ia.is_active = true`,
     [igBusinessUserId]
   );
-  if (acctResult.rows.length === 0) return;
+  if (acctResult.rows.length === 0) {
+    // Fallback: for page-object webhooks, recipient.id is the Page ID
+    acctResult = await pool.query(
+      `SELECT ia.*, c.page_slug FROM instagram_accounts ia
+       JOIN creators c ON c.id = ia.creator_id
+       WHERE ia.page_id = $1 AND ia.is_active = true`,
+      [igBusinessUserId]
+    );
+  }
+  if (acctResult.rows.length === 0) {
+    console.log('⚠️ No account found for recipient ID:', igBusinessUserId);
+    return;
+  }
 
   const account = acctResult.rows[0];
   const creatorId = account.creator_id;
@@ -285,7 +302,7 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 
     // 9. Send the DM via Meta API
     try {
-      await sendDM(igBusinessUserId, senderIgsid, response, account.access_token);
+      await sendDM(account.ig_user_id, senderIgsid, response, account.access_token);
 
       // 10. Log outbound message
       await pool.query(
@@ -306,6 +323,62 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
     break; // Only fire the first matching automation per message
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// DEBUG / TEST ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/instagram/test-webhook
+ * Simulates an incoming DM to test the full automation pipeline.
+ * Body: { ig_user_id_or_page_id, sender_id, message }
+ */
+router.post('/test-webhook', auth, async (req, res) => {
+  try {
+    const { message = 'book', sender_id = 'test_sender_123' } = req.body;
+
+    // Get connected account for this creator
+    const acct = await pool.query(
+      `SELECT ig_user_id, page_id FROM instagram_accounts WHERE creator_id = $1 AND is_active = true LIMIT 1`,
+      [req.creator.id]
+    );
+    if (acct.rows.length === 0) {
+      return res.status(400).json({ error: 'No connected Instagram account' });
+    }
+
+    const recipientId = acct.rows[0].ig_user_id;
+    console.log(`🧪 Test webhook: message="${message}" to ig_user_id=${recipientId}`);
+    await processIncomingMessage(recipientId, sender_id, message);
+    res.json({ success: true, tested_with: { recipientId, sender_id, message } });
+  } catch (err) {
+    console.error('Test webhook error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/debug-accounts
+ * Returns current DB state for debugging.
+ */
+router.get('/debug-accounts', auth, async (req, res) => {
+  try {
+    const accounts = await pool.query(
+      `SELECT id, ig_user_id, ig_username, page_id, page_name, is_active FROM instagram_accounts WHERE creator_id = $1`,
+      [req.creator.id]
+    );
+    const automations = await pool.query(
+      `SELECT id, ig_account_id, name, trigger_type, keywords, is_active, total_triggered FROM dm_automations WHERE creator_id = $1`,
+      [req.creator.id]
+    );
+    const messages = await pool.query(
+      `SELECT direction, message_text, created_at FROM dm_messages WHERE creator_id = $1 ORDER BY id DESC LIMIT 10`,
+      [req.creator.id]
+    );
+    res.json({ accounts: accounts.rows, automations: automations.rows, recent_messages: messages.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─────────────────────────────────────────────────────────────
 // INSTAGRAM ACCOUNT — CRUD
