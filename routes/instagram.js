@@ -328,6 +328,25 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 // ─────────────────────────────────────────────────────────────
 // TEMP DEBUG — remove after testing
 // ─────────────────────────────────────────────────────────────
+
+// Re-subscribe all pages to webhook
+router.post('/resubscribe-pages', async (req, res) => {
+  try {
+    const accounts = await pool.query(`SELECT page_id, access_token, ig_username FROM instagram_accounts WHERE is_active = true`);
+    const results = [];
+    for (const acc of accounts.rows) {
+      try {
+        const r = await subscribePageWebhook(acc.page_id, acc.access_token);
+        results.push({ ig_username: acc.ig_username, page_id: acc.page_id, result: r });
+      } catch (e) {
+        results.push({ ig_username: acc.ig_username, page_id: acc.page_id, error: e.response?.data || e.message });
+      }
+    }
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get('/debug-accounts', async (req, res) => {
   try {
     const accounts = await pool.query(
