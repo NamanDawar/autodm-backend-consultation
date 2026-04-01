@@ -210,13 +210,25 @@ router.post('/webhook', async (req, res) => {
  */
 async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText) {
   // 1. Find the instagram_account record in DB
-  const acctResult = await pool.query(
+  // Try ig_user_id first (object=instagram webhooks), then page_id (object=page webhooks)
+  let acctResult = await pool.query(
     `SELECT ia.*, c.page_slug FROM instagram_accounts ia
      JOIN creators c ON c.id = ia.creator_id
      WHERE ia.ig_user_id = $1 AND ia.is_active = true`,
     [igBusinessUserId]
   );
-  if (acctResult.rows.length === 0) return;
+  if (acctResult.rows.length === 0) {
+    acctResult = await pool.query(
+      `SELECT ia.*, c.page_slug FROM instagram_accounts ia
+       JOIN creators c ON c.id = ia.creator_id
+       WHERE ia.page_id = $1 AND ia.is_active = true`,
+      [igBusinessUserId]
+    );
+  }
+  if (acctResult.rows.length === 0) {
+    console.log('⚠️ No account found for recipient ID:', igBusinessUserId);
+    return;
+  }
 
   const account = acctResult.rows[0];
   const creatorId = account.creator_id;
@@ -291,7 +303,7 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 
     // 9. Send the DM via Meta API
     try {
-      await sendDM(igBusinessUserId, senderIgsid, response, account.access_token);
+      await sendDM(account.ig_user_id, senderIgsid, response, account.access_token);
 
       // 10. Log outbound message
       await pool.query(
