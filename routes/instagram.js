@@ -329,18 +329,32 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 // TEMP DEBUG — remove after testing
 // ─────────────────────────────────────────────────────────────
 
-// Re-subscribe all pages to webhook
+// Re-subscribe all pages + IG accounts to webhook
 router.post('/resubscribe-pages', async (req, res) => {
   try {
-    const accounts = await pool.query(`SELECT page_id, access_token, ig_username FROM instagram_accounts WHERE is_active = true`);
+    const accounts = await pool.query(`SELECT page_id, ig_user_id, access_token, ig_username FROM instagram_accounts WHERE is_active = true`);
     const results = [];
     for (const acc of accounts.rows) {
+      const entry = { ig_username: acc.ig_username };
+      // 1. Subscribe Facebook Page (Messenger API)
       try {
-        const r = await subscribePageWebhook(acc.page_id, acc.access_token);
-        results.push({ ig_username: acc.ig_username, page_id: acc.page_id, result: r });
+        const r1 = await subscribePageWebhook(acc.page_id, acc.access_token);
+        entry.page_sub = r1;
       } catch (e) {
-        results.push({ ig_username: acc.ig_username, page_id: acc.page_id, error: e.response?.data || e.message });
+        entry.page_sub_error = e.response?.data || e.message;
       }
+      // 2. Subscribe Instagram Business Account
+      try {
+        const { data } = await axios.post(
+          `https://graph.facebook.com/v21.0/${acc.ig_user_id}/subscribed_apps`,
+          { subscribed_fields: ['messages', 'messaging_postbacks'] },
+          { params: { access_token: acc.access_token } }
+        );
+        entry.ig_sub = data;
+      } catch (e) {
+        entry.ig_sub_error = e.response?.data || e.message;
+      }
+      results.push(entry);
     }
     res.json(results);
   } catch (err) {
