@@ -333,6 +333,46 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 // ─────────────────────────────────────────────────────────────
 
 /**
+ * GET /api/instagram/subscription-status
+ * Checks whether the Facebook Page is actually subscribed to webhook events.
+ * Also re-subscribes if not already subscribed.
+ */
+router.get('/subscription-status', auth, async (req, res) => {
+  try {
+    const acct = await pool.query(
+      `SELECT page_id, page_name, ig_user_id, access_token FROM instagram_accounts WHERE creator_id = $1 AND is_active = true LIMIT 1`,
+      [req.creator.id]
+    );
+    if (acct.rows.length === 0) return res.status(400).json({ error: 'No connected account' });
+
+    const { page_id, page_name, ig_user_id, access_token } = acct.rows[0];
+
+    // Check current page subscription
+    const { data: subData } = await axios.get(
+      `${GRAPH}/${page_id}/subscribed_apps`,
+      { params: { access_token } }
+    );
+
+    // Re-subscribe to ensure it's active
+    const { data: resubData } = await axios.post(
+      `${GRAPH}/${page_id}/subscribed_apps`,
+      { subscribed_fields: ['messages', 'messaging_postbacks'] },
+      { params: { access_token } }
+    );
+
+    res.json({
+      page_id,
+      page_name,
+      ig_user_id,
+      current_subscriptions: subData.data || [],
+      resubscribe_result: resubData,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
+/**
  * POST /api/instagram/test-webhook
  * Simulates an incoming DM to test the full automation pipeline.
  * Body: { message, sender_id }
