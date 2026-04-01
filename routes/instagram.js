@@ -374,6 +374,22 @@ router.get('/subscription-status', auth, async (req, res) => {
 });
 
 /**
+ * GET /api/instagram/app-subscriptions
+ * Checks app-level webhook subscriptions via app access token.
+ */
+router.get('/app-subscriptions', auth, async (req, res) => {
+  try {
+    const appToken = `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`;
+    const { data } = await axios.get(`${GRAPH}/${process.env.META_APP_ID}/subscriptions`, {
+      params: { access_token: appToken },
+    });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
+/**
  * POST /api/instagram/test-webhook
  * Simulates an incoming DM to test the full automation pipeline.
  * Body: { message, sender_id }
