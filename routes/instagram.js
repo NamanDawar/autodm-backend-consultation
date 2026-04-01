@@ -326,6 +326,16 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 }
 
 // ─────────────────────────────────────────────────────────────
+// TEMP DEBUG — remove after testing
+// ─────────────────────────────────────────────────────────────
+router.get('/debug-accounts', async (req, res) => {
+  const result = await pool.query(
+    `SELECT ig_user_id, ig_username, page_id, page_name, is_active FROM instagram_accounts`
+  );
+  res.json(result.rows);
+});
+
+// ─────────────────────────────────────────────────────────────
 // INSTAGRAM ACCOUNT — CRUD
 // ─────────────────────────────────────────────────────────────
 
