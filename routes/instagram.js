@@ -350,10 +350,10 @@ router.post('/resubscribe-pages', async (req, res) => {
 router.get('/debug-accounts', async (req, res) => {
   try {
     const accounts = await pool.query(
-      `SELECT ig_user_id, ig_username, page_id, page_name, is_active FROM instagram_accounts`
+      `SELECT id, ig_user_id, ig_username, page_id, page_name, is_active FROM instagram_accounts`
     );
     const automations = await pool.query(
-      `SELECT id, name, trigger_type, keywords, is_active, total_triggered FROM dm_automations`
+      `SELECT id, ig_account_id, name, trigger_type, keywords, is_active, total_triggered FROM dm_automations`
     );
     const messages = await pool.query(
       `SELECT direction, message_text FROM dm_messages ORDER BY id DESC LIMIT 5`
