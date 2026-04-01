@@ -191,8 +191,10 @@ router.post('/webhook', async (req, res) => {
       if (event.message?.is_echo) continue;
 
       const senderIgsid = event.sender?.id;   // sender's IGSID
-      const recipientId = event.recipient?.id; // our IG Business User ID
+      const recipientId = event.recipient?.id; // our IG Business User ID or Page ID
       const messageText = event.message?.text;
+
+      console.log(`📩 Message from ${senderIgsid} to ${recipientId}: "${messageText}"`);
 
       if (!messageText || !senderIgsid) continue;
 
@@ -218,6 +220,7 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
     [igBusinessUserId]
   );
   if (acctResult.rows.length === 0) {
+    // Fallback: for page-object webhooks, recipient.id is the Page ID
     acctResult = await pool.query(
       `SELECT ia.*, c.page_slug FROM instagram_accounts ia
        JOIN creators c ON c.id = ia.creator_id
@@ -326,51 +329,54 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 }
 
 // ─────────────────────────────────────────────────────────────
-// TEMP DEBUG — remove after testing
+// DEBUG / TEST ENDPOINTS
 // ─────────────────────────────────────────────────────────────
 
-// Re-subscribe all pages + IG accounts to webhook
-router.post('/resubscribe-pages', async (req, res) => {
+/**
+ * POST /api/instagram/test-webhook
+ * Simulates an incoming DM to test the full automation pipeline.
+ * Body: { message, sender_id }
+ */
+router.post('/test-webhook', auth, async (req, res) => {
   try {
-    const accounts = await pool.query(`SELECT page_id, ig_user_id, access_token, ig_username FROM instagram_accounts WHERE is_active = true`);
-    const results = [];
-    for (const acc of accounts.rows) {
-      const entry = { ig_username: acc.ig_username };
-      // 1. Subscribe Facebook Page (Messenger API)
-      try {
-        const r1 = await subscribePageWebhook(acc.page_id, acc.access_token);
-        entry.page_sub = r1;
-      } catch (e) {
-        entry.page_sub_error = e.response?.data || e.message;
-      }
-      // 2. Subscribe Instagram Business Account
-      try {
-        const { data } = await axios.post(
-          `https://graph.facebook.com/v21.0/${acc.ig_user_id}/subscribed_apps`,
-          { subscribed_fields: ['messages', 'messaging_postbacks'] },
-          { params: { access_token: acc.access_token } }
-        );
-        entry.ig_sub = data;
-      } catch (e) {
-        entry.ig_sub_error = e.response?.data || e.message;
-      }
-      results.push(entry);
+    const { message = 'book', sender_id = 'test_sender_123' } = req.body;
+
+    // Get connected account for this creator
+    const acct = await pool.query(
+      `SELECT ig_user_id, page_id FROM instagram_accounts WHERE creator_id = $1 AND is_active = true LIMIT 1`,
+      [req.creator.id]
+    );
+    if (acct.rows.length === 0) {
+      return res.status(400).json({ error: 'No connected Instagram account' });
     }
-    res.json(results);
+
+    const recipientId = acct.rows[0].ig_user_id;
+    console.log(`🧪 Test webhook: message="${message}" to ig_user_id=${recipientId}`);
+    await processIncomingMessage(recipientId, sender_id, message);
+    res.json({ success: true, tested_with: { recipientId, sender_id, message } });
   } catch (err) {
+    console.error('Test webhook error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
-router.get('/debug-accounts', async (req, res) => {
+
+/**
+ * GET /api/instagram/debug-accounts
+ * Returns current DB state for debugging.
+ */
+router.get('/debug-accounts', auth, async (req, res) => {
   try {
     const accounts = await pool.query(
-      `SELECT id, ig_user_id, ig_username, page_id, page_name, is_active FROM instagram_accounts`
+      `SELECT id, ig_user_id, ig_username, page_id, page_name, is_active FROM instagram_accounts WHERE creator_id = $1`,
+      [req.creator.id]
     );
     const automations = await pool.query(
-      `SELECT id, ig_account_id, name, trigger_type, keywords, is_active, total_triggered FROM dm_automations`
+      `SELECT id, ig_account_id, name, trigger_type, keywords, is_active, total_triggered FROM dm_automations WHERE creator_id = $1`,
+      [req.creator.id]
     );
     const messages = await pool.query(
-      `SELECT direction, message_text FROM dm_messages ORDER BY id DESC LIMIT 5`
+      `SELECT direction, message_text, created_at FROM dm_messages WHERE creator_id = $1 ORDER BY id DESC LIMIT 10`,
+      [req.creator.id]
     );
     res.json({ accounts: accounts.rows, automations: automations.rows, recent_messages: messages.rows });
   } catch (err) {
