@@ -329,10 +329,16 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 // TEMP DEBUG — remove after testing
 // ─────────────────────────────────────────────────────────────
 router.get('/debug-accounts', async (req, res) => {
-  const result = await pool.query(
+  const accounts = await pool.query(
     `SELECT ig_user_id, ig_username, page_id, page_name, is_active FROM instagram_accounts`
   );
-  res.json(result.rows);
+  const automations = await pool.query(
+    `SELECT name, trigger_type, keywords, is_active, total_triggered FROM dm_automations`
+  );
+  const messages = await pool.query(
+    `SELECT direction, message_text, created_at FROM dm_messages ORDER BY created_at DESC LIMIT 10`
+  );
+  res.json({ accounts: accounts.rows, automations: automations.rows, recent_messages: messages.rows });
 });
 
 // ─────────────────────────────────────────────────────────────
