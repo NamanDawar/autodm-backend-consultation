@@ -194,13 +194,14 @@ router.post('/webhook', async (req, res) => {
       const senderIgsid = event.sender?.id;   // sender's IGSID
       const recipientId = event.recipient?.id; // our IG Business User ID or Page ID
       const messageText = event.message?.text;
+      const igMessageId = event.message?.mid;
 
       console.log(`📩 Message from ${senderIgsid} to ${recipientId}: "${messageText}"`);
 
       if (!messageText || !senderIgsid) continue;
 
       try {
-        await processIncomingMessage(recipientId, senderIgsid, messageText);
+        await processIncomingMessage(recipientId, senderIgsid, messageText, igMessageId);
       } catch (err) {
         console.error('Error processing webhook message:', err.message);
       }
@@ -208,10 +209,67 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────
+// POLLING — fallback for Development Mode webhook restrictions
+// ─────────────────────────────────────────────────────────────
+
+async function pollInstagramMessages() {
+  try {
+    const accounts = await pool.query(
+      `SELECT ia.*, c.page_slug FROM instagram_accounts ia
+       JOIN creators c ON c.id = ia.creator_id
+       WHERE ia.is_active = true`
+    );
+
+    for (const account of accounts.rows) {
+      try {
+        const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+        const { data } = await axios.get(`${GRAPH}/${account.page_id}/conversations`, {
+          params: {
+            platform: 'instagram',
+            fields: 'id,updated_time,messages{id,message,from,created_time}',
+            access_token: account.access_token,
+          },
+        });
+
+        for (const conv of data.data || []) {
+          if (new Date(conv.updated_time) < new Date(since)) continue;
+
+          for (const msg of conv.messages?.data || []) {
+            if (new Date(msg.created_time) < new Date(since)) continue;
+            if (msg.from?.id === account.ig_user_id) continue; // skip echoes
+            if (!msg.message) continue;
+
+            console.log(`🔄 Poll found message id=${msg.id} from ${msg.from?.id}: "${msg.message}"`);
+            await processIncomingMessage(account.ig_user_id, msg.from.id, msg.message, msg.id);
+          }
+        }
+      } catch (err) {
+        console.error(`Poll error for ${account.ig_username}:`, err.response?.data || err.message);
+      }
+    }
+  } catch (err) {
+    console.error('Poll error:', err.message);
+  }
+}
+
+// Poll every 30 seconds
+setInterval(pollInstagramMessages, 30000);
+
 /**
  * Core automation engine — called for each inbound DM
  */
-async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText) {
+async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText, igMessageId = null) {
+  // Deduplicate: skip if we already processed this Instagram message
+  if (igMessageId) {
+    const exists = await pool.query(
+      `SELECT 1 FROM dm_messages WHERE ig_message_id = $1 LIMIT 1`,
+      [igMessageId]
+    );
+    if (exists.rows.length > 0) return;
+  }
+
   // 1. Find the instagram_account record in DB
   // Try ig_user_id first (object=instagram webhooks), then page_id (object=page webhooks)
   let acctResult = await pool.query(
@@ -251,9 +309,9 @@ async function processIncomingMessage(igBusinessUserId, senderIgsid, messageText
 
   // 3. Log inbound message
   await pool.query(
-    `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text)
-     VALUES ($1, $2, $3, 'inbound', $4)`,
-    [creatorId, igAccountId, subscriberId, messageText]
+    `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, ig_message_id)
+     VALUES ($1, $2, $3, 'inbound', $4, $5)`,
+    [creatorId, igAccountId, subscriberId, messageText, igMessageId]
   );
 
   // 4. Check if this is the first-ever DM from this sender
@@ -370,6 +428,19 @@ router.get('/subscription-status', auth, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/poll
+ * Manually triggers a poll for new Instagram messages right now.
+ */
+router.post('/poll', auth, async (req, res) => {
+  try {
+    await pollInstagramMessages();
+    res.json({ success: true, message: 'Poll completed — check Railway logs' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
