@@ -254,8 +254,8 @@ async function pollInstagramMessages() {
   }
 }
 
-// Poll every 30 seconds
-setInterval(pollInstagramMessages, 30000);
+// Polling disabled in Development Mode — Meta blocks it without Advanced Access
+// setInterval(pollInstagramMessages, 30000);
 
 /**
  * Core automation engine — called for each inbound DM
