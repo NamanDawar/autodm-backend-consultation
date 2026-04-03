@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const auth = require('../middleware/auth');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const { createMeetEvent } = require('../services/googleCalendar');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -74,12 +75,30 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ error: 'Payment verification failed' });
     }
 
-    // Generate Google Meet link (simple unique link)
-    const chars = "abcdefghijklmnopqrstuvwxyz"; const rand = (n) => Array.from({length:n}, () => chars[Math.floor(Math.random()*chars.length)]).join(""); const meetLink = `https://meet.google.com/${rand(4)}-${rand(4)}-${rand(4)}`;
+    // Fetch booking to get creator_id, slot times, client details
+    const bookingData = await pool.query(
+      `SELECT b.*, s.video_platform FROM bookings b
+       JOIN services s ON s.id = b.service_id
+       WHERE b.id = $1`,
+      [booking_id]
+    );
+    const bookingRow = bookingData.rows[0];
+
+    // Generate meet link — real Google Meet if creator connected Google, else fallback
+    let meetLink;
+    try {
+      meetLink = await createMeetEvent(bookingRow.creator_id, bookingRow);
+      console.log('✅ Real Google Meet created:', meetLink);
+    } catch (calErr) {
+      console.warn('⚠️ Google Calendar failed, using fallback link:', calErr.message);
+      const chars = 'abcdefghijklmnopqrstuvwxyz';
+      const rand = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      meetLink = `https://meet.google.com/${rand(4)}-${rand(4)}-${rand(4)}`;
+    }
 
     // Update booking to confirmed
     const bookingResult = await pool.query(
-      `UPDATE bookings SET 
+      `UPDATE bookings SET
        status='confirmed', payment_id=$1, meet_link=$2
        WHERE id=$3 RETURNING *`,
       [razorpay_payment_id, meetLink, booking_id]

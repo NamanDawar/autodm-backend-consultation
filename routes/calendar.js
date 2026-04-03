@@ -2,7 +2,40 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 const auth = require('../middleware/auth');
+const { getAuthUrl, handleOAuthCallback } = require('../services/googleCalendar');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+// ─── Google OAuth ─────────────────────────────────────────────
+
+// Step 1: redirect creator to Google consent screen
+router.get('/google/connect', auth, (req, res) => {
+  const url = getAuthUrl(req.creator.id);
+  res.json({ url });
+});
+
+// Step 2: Google redirects back here with ?code=...&state=creatorId
+router.get('/google/callback', async (req, res) => {
+  const { code, state: creatorId, error } = req.query;
+  if (error || !code) {
+    return res.redirect(`${process.env.FRONTEND_URL}/dashboard?google_error=access_denied`);
+  }
+  try {
+    await handleOAuthCallback(code, creatorId);
+    res.redirect(`${process.env.FRONTEND_URL}/dashboard?google_connected=true`);
+  } catch (err) {
+    console.error('Google OAuth callback error:', err.message);
+    res.redirect(`${process.env.FRONTEND_URL}/dashboard?google_error=failed`);
+  }
+});
+
+// Check if Google is connected
+router.get('/google/status', auth, async (req, res) => {
+  const result = await pool.query(
+    'SELECT google_refresh_token IS NOT NULL as connected FROM creators WHERE id=$1',
+    [req.creator.id]
+  );
+  res.json({ connected: result.rows[0]?.connected || false });
+});
 
 router.post('/availability', auth, async (req, res) => {
   try {
