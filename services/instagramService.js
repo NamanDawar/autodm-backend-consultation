@@ -154,4 +154,5 @@ module.exports = {
   getPageWebhookSubscriptions,
   doesMessageMatch,
   buildResponseMessage,
+  sendComment,
 };
