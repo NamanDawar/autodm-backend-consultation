@@ -67,6 +67,17 @@ async function sendDM(igAccountId, recipientId, messageText, pageAccessToken) {
   return data; // { recipient_id, message_id }
 }
 
+async function sendComment(igAccountId, commentId, messageText, pageAccessToken) {
+  const { data } = await axios.post(
+    `${GRAPH}/${commentId}/replies`,
+    {
+      message: messageText,
+    },
+    { params: { access_token: pageAccessToken } }
+  );
+  return data; // { id: reply_id }
+}
+
 // ─── Webhook Management ────────────────────────────────────────────────────────
 
 /**
