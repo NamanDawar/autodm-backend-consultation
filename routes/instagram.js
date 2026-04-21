@@ -446,46 +446,27 @@ async function processIncomingMessage(
 
     // 9. Send the DM via Meta API
     try {
-      await sendDM(
-        account.ig_user_id,
-        senderIgsid,
-        response,
-        account.access_token,
-      );
-
-      // 10. Log outbound message
-      await pool.query(
-        `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, automation_id)
-         VALUES ($1, $2, $3, 'outbound', $4, $5)`,
-        [creatorId, igAccountId, subscriberId, response, automation.id],
-      );
-
       if (type === "comment") {
-        // Send comment reply using the sendComment function
-       
         await sendComment(
           account.ig_user_id,
           commentId,
           response,
           account.access_token,
         );
-
-        // Log comment reply
-        // await pool.query(
-        //   `INSERT INTO instagram_comments (creator_id, ig_account_id, comment_id, comment_text)
-        //    VALUES ($1, $2, $3, $4)`,
-        //   [creatorId, igAccountId, commentId, response],
-        // );
-
         console.log(`Comment reply sent`);
       }
-
-      // 10. Increment trigger counter
-      await pool.query(
-        `UPDATE dm_automations SET total_triggered = total_triggered + 1 WHERE id = $1`,
-        [automation.id],
+      await sendDM(
+        account.ig_user_id,
+        senderIgsid,
+        response,
+        account.access_token,
       );
-
+      // 10. Log outbound message
+      await pool.query(
+        `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, automation_id)
+         VALUES ($1, $2, $3, 'outbound', $4, $5)`,
+        [creatorId, igAccountId, subscriberId, response, automation.id],
+      );
       // 11. Increment trigger counter
       await pool.query(
         `UPDATE dm_automations SET total_triggered = total_triggered + 1 WHERE id = $1`,
