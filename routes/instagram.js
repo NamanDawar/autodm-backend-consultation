@@ -329,13 +329,14 @@ async function processIncomingMessage(
       [igMessageId],
     );
     if (exists.rows.length > 0) return;
-  } else if (type === "comment" && commentId) {
-    const exists = await pool.query(
-      `SELECT 1 FROM instagram_comments WHERE comment_id = $1 LIMIT 1`,
-      [commentId],
-    );
-    if (exists.rows.length > 0) return;
   }
+  // } else if (type === "comment" && commentId) {
+  //   const exists = await pool.query(
+  //     `SELECT 1 FROM instagram_comments WHERE comment_id = $1 LIMIT 1`,
+  //     [commentId],
+  //   );
+  //   if (exists.rows.length > 0) return;
+  // }
 
   // 1. Find the instagram_account record in DB
   // Try ig_user_id first (object=instagram webhooks), then page_id (object=page webhooks)
