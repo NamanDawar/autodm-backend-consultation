@@ -360,7 +360,7 @@ async function processIncomingMessage(
     return;
   }
 
-  const account = acctResult.rows[0];
+  const account = acctResult.rows[acctResult.rows.length - 1]; // In case of multiple, take the most recently created one
   const creatorId = account.creator_id;
   const igAccountId = account.id;
 
