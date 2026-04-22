@@ -456,7 +456,7 @@ async function processIncomingMessage(
         console.log(`Comment reply sent`);
       }
       await sendDM(
-        account.ig_user_id,
+        account.page_id,
         senderIgsid,
         response,
         account.access_token,
