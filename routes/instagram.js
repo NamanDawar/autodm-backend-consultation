@@ -58,7 +58,7 @@ router.get("/connect", auth, (req, res) => {
  * Exchanges code → token → finds linked IG account → saves to DB.
  */
 router.get("/callback", async (req, res) => {
-  const { code, state: creatorId, error } = req.query;
+  const { code, state: creatorId, error } = req.query; // ← must be first
 
   if (error || !code) {
     return res.redirect(
@@ -85,7 +85,6 @@ router.get("/callback", async (req, res) => {
     // 3. Get all Facebook Pages + their linked Instagram Business Accounts
     const pages = await getUserPages(userAccessToken);
 
-    // Find first page that has a linked Instagram Business account
     const pageWithIG = pages.find((p) => p.instagram_business_account);
     if (!pageWithIG) {
       return res.redirect(
@@ -99,7 +98,19 @@ router.get("/callback", async (req, res) => {
     // 4. Get full Instagram account details
     const igInfo = await getIGAccountInfo(igAccount.id, pageAccessToken);
 
-    // 5. Calculate token expiry (long-lived = ~60 days)
+    //Check here - after igInfo is available
+    const existing = await pool.query(
+      `SELECT creator_id FROM instagram_accounts 
+       WHERE ig_user_id = $1 AND creator_id != $2 AND is_active = true`,
+      [igInfo.id, creatorId]
+    );
+    if (existing.rows.length > 0) {
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/automations?error=ig_already_connected`
+      );
+    }
+
+    // 5. Calculate token expiry
     const expiresAt = new Date(
       Date.now() + (longTokenData.expires_in || 5184000) * 1000,
     );
