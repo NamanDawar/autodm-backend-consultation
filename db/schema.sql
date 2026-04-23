@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS instagram_accounts (
   token_expires_at TIMESTAMP,
   page_id VARCHAR(255),                      -- Facebook Page ID linked to IG
   page_name VARCHAR(255),
+  login_type VARCHAR(20) DEFAULT 'instagram',
   is_active BOOLEAN DEFAULT true,
   connected_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(creator_id, ig_user_id)

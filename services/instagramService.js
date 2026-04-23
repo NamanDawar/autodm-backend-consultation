@@ -1,6 +1,7 @@
 const axios = require('axios');
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
+const IG_GRAPH = 'https://graph.instagram.com/v21.0';
 
 // ─── Token Exchange ────────────────────────────────────────────────────────────
 
@@ -55,9 +56,9 @@ async function getIGAccountInfo(igUserId, accessToken) {
  * igAccountId  → your Instagram Business User ID
  * recipientId  → the IGSID (Instagram-scoped user ID) of the recipient
  */
-async function sendDM(igAccountId, recipientId, messageText, pageAccessToken) {
+async function sendDM(pageId, recipientId, messageText, pageAccessToken) {
   const { data } = await axios.post(
-    `${GRAPH}/${igAccountId}/messages`,
+    `${GRAPH}/${pageId}/messages`,
     {
       recipient: { id: recipientId },
       message: { text: messageText },
@@ -65,6 +66,18 @@ async function sendDM(igAccountId, recipientId, messageText, pageAccessToken) {
     { params: { access_token: pageAccessToken } }
   );
   return data; // { recipient_id, message_id }
+}
+
+async function sendDMInstagram(igUserId, recipientId, messageText, accessToken) {
+  const { data } = await axios.post(
+    `${IG_GRAPH}/${igUserId}/messages`,
+    {
+      recipient: { id: recipientId },
+      message: { text: messageText },
+    },
+    { params: { access_token: accessToken } }
+  );
+  return data;
 }
 
 async function sendComment(igAccountId, commentId, messageText, pageAccessToken) {
@@ -155,4 +168,5 @@ module.exports = {
   doesMessageMatch,
   buildResponseMessage,
   sendComment,
+  sendDMInstagram
 };

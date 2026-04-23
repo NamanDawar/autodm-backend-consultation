@@ -11,7 +11,8 @@ const {
   subscribePageWebhook,
   doesMessageMatch,
   buildResponseMessage,
-  sendComment
+  sendComment,
+  sendDMInstagram
 } = require("../services/instagramService");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -466,12 +467,11 @@ async function processIncomingMessage(
         );
         console.log(`Comment reply sent`);
       }
-      await sendDM(
-        account.page_id,
-        senderIgsid,
-        response,
-        account.access_token,
-      );
+      if (account.login_type === 'instagram') {
+         await sendDMInstagram(account.ig_user_id, senderIgsid, response, account.access_token);
+     } else {
+        await sendDM(account.page_id, senderIgsid, response, account.access_token);
+     }
       // 10. Log outbound message
       await pool.query(
         `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, automation_id)
@@ -868,6 +868,130 @@ router.get("/stats", auth, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+
+router.get("/connect-instagram", auth, (req, res) => {
+  const scopes = [
+    "instagram_basic",
+    "instagram_manage_messages", 
+    "instagram_manage_comments",
+  ].join(",");
+
+  const redirectUri = `${process.env.BACKEND_URL}/api/instagram/callback-instagram`;
+  const state = req.creator.id;
+
+  const url =
+    `https://api.instagram.com/oauth/authorize` +
+    `?client_id=${process.env.INSTAGRAM_APP_ID}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&scope=${encodeURIComponent(scopes)}` +
+    `&response_type=code` +
+    `&state=${state}`;
+
+  res.json({ url });
+});
+
+router.get("/callback-instagram", async (req, res) => {
+  const { code, state: creatorId, error } = req.query;
+
+  if (error || !code) {
+    return res.redirect(
+      `${process.env.FRONTEND_URL}/automations?error=instagram_denied`
+    );
+  }
+
+  try {
+    // 1. Exchange code for short-lived token
+    const tokenRes = await axios.post(
+      `https://api.instagram.com/oauth/access_token`,
+      new URLSearchParams({
+        client_id: process.env.INSTAGRAM_APP_ID,
+        client_secret: process.env.INSTAGRAM_APP_SECRET,
+        grant_type: "authorization_code",
+        redirect_uri: `${process.env.BACKEND_URL}/api/instagram/callback-instagram`,
+        code,
+      })
+    );
+    const shortToken = tokenRes.data.access_token;
+    const igUserId = tokenRes.data.user_id;
+
+    // 2. Exchange for long-lived token
+    const longTokenRes = await axios.get(
+      `https://graph.instagram.com/access_token`,
+      {
+        params: {
+          grant_type: "ig_exchange_token",
+          client_secret: process.env.INSTAGRAM_APP_SECRET,
+          access_token: shortToken,
+        },
+      }
+    );
+    const longToken = longTokenRes.data.access_token;
+    const expiresIn = longTokenRes.data.expires_in;
+
+    // 3. Get IG account info
+    const igInfo = await axios.get(
+      `https://graph.instagram.com/v21.0/${igUserId}`,
+      {
+        params: {
+          fields: "id,username,name,profile_picture_url,followers_count",
+          access_token: longToken,
+        },
+      }
+    );
+    const ig = igInfo.data;
+
+    // 4. Check duplicate
+    const existing = await pool.query(
+      `SELECT creator_id FROM instagram_accounts 
+       WHERE ig_user_id = $1 AND creator_id != $2 AND is_active = true`,
+      [ig.id, creatorId]
+    );
+    if (existing.rows.length > 0) {
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/automations?error=ig_already_connected`
+      );
+    }
+
+    // 5. Calculate expiry
+    const expiresAt = new Date(Date.now() + (expiresIn || 5184000) * 1000);
+
+    // 6. Upsert into DB — note: no page_id for Instagram Login
+    await pool.query(
+      `INSERT INTO instagram_accounts
+         (creator_id, ig_user_id, ig_username, ig_name, ig_profile_pic, ig_followers,
+          access_token, token_expires_at, login_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'instagram')
+       ON CONFLICT (creator_id, ig_user_id)
+       DO UPDATE SET
+         ig_username = EXCLUDED.ig_username,
+         ig_name = EXCLUDED.ig_name,
+         ig_profile_pic = EXCLUDED.ig_profile_pic,
+         ig_followers = EXCLUDED.ig_followers,
+         access_token = EXCLUDED.access_token,
+         token_expires_at = EXCLUDED.token_expires_at,
+         login_type = 'instagram',
+         is_active = true`,
+      [
+        creatorId,
+        ig.id,
+        ig.username,
+        ig.name,
+        ig.profile_picture_url,
+        ig.followers_count || 0,
+        longToken,
+        expiresAt,
+      ]
+    );
+
+    res.redirect(`${process.env.FRONTEND_URL}/automations?connected=true`);
+  } catch (err) {
+    console.error("Instagram callback error:", err.response?.data || err.message);
+    res.redirect(
+      `${process.env.FRONTEND_URL}/automations?error=connect_failed`
+    );
   }
 });
 
