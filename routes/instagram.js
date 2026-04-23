@@ -873,8 +873,6 @@ router.get("/stats", auth, async (req, res) => {
 
 
 router.get("/connect-instagram", auth, (req, res) => {
-  console.log("INSTAGRAM_APP_ID:", process.env.INSTAGRAM_APP_ID);
-  console.log("BACKEND_URL:", process.env.BACKEND_URL);
   const scopes = [
     "instagram_basic",
     "instagram_manage_messages", 
@@ -885,7 +883,7 @@ router.get("/connect-instagram", auth, (req, res) => {
   const state = req.creator.id;
 
   const url =
-    `https://api.instagram.com/oauth/authorize` +
+    `https://www.instagram.com/oauth/authorize` +  // ← changed from api.instagram.com
     `?client_id=${process.env.INSTAGRAM_APP_ID}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&scope=${encodeURIComponent(scopes)}` +
