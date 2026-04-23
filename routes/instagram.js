@@ -903,7 +903,7 @@ router.get("/callback-instagram", async (req, res) => {
   }
 
   try {
-    // 1. Exchange code for token
+    // 1. Exchange code for short-lived token
     const tokenRes = await axios.post(
       `https://api.instagram.com/oauth/access_token`,
       new URLSearchParams({
@@ -914,16 +914,28 @@ router.get("/callback-instagram", async (req, res) => {
         code,
       })
     );
-    console.log("tokenRes:", tokenRes.data);
-    const longToken = tokenRes.data.access_token; // ← use directly
-    const expiresIn = tokenRes.data.expires_in || 5184000;
+    const shortToken = tokenRes.data.access_token;
 
-    // 2. Get IG account info
+    // 2. Exchange for long-lived token ← correct endpoint for Business Login
+    const longTokenRes = await axios.get(
+      `https://graph.instagram.com/oauth/access_token`, // ← changed from /access_token
+      {
+        params: {
+          grant_type: "ig_exchange_token",
+          client_secret: process.env.INSTAGRAM_APP_SECRET,
+          access_token: shortToken,
+        },
+      }
+    );
+    const longToken = longTokenRes.data.access_token;
+    const expiresIn = longTokenRes.data.expires_in || 5184000;
+
+    // 3. Get IG account info
     const igInfoRes = await axios.get(
       `https://graph.instagram.com/v21.0/me`,
       {
         params: {
-          fields: "id,username,name,profile_picture_url,followers_count,user_id",
+          fields: "id,username,name,profile_picture_url,followers_count",
           access_token: longToken,
         },
       }
@@ -931,7 +943,7 @@ router.get("/callback-instagram", async (req, res) => {
     const ig = igInfoRes.data;
     console.log("✅ IG account:", ig);
 
-    // 3. Check duplicate
+    // 4. Check duplicate
     const existing = await pool.query(
       `SELECT creator_id FROM instagram_accounts 
        WHERE ig_user_id = $1 AND creator_id != $2 AND is_active = true`,
@@ -943,10 +955,10 @@ router.get("/callback-instagram", async (req, res) => {
       );
     }
 
-    // 4. Calculate expiry
+    // 5. Calculate expiry
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
-    // 5. Upsert into DB
+    // 6. Upsert into DB
     await pool.query(
       `INSERT INTO instagram_accounts
          (creator_id, ig_user_id, ig_username, ig_name, ig_profile_pic, ig_followers,
