@@ -979,7 +979,7 @@ router.get("/callback-instagram", async (req, res) => {
          is_active = true`,
       [
         creatorId,
-        ig.id,
+        ig.user_id,
         ig.username,
         ig.name,
         ig.profile_picture_url,
