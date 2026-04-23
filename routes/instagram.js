@@ -920,7 +920,7 @@ router.get("/callback-instagram", async (req, res) => {
 
     // 2. Exchange for long-lived token
     const longTokenRes = await axios.get(
-      `https://graph.instagram.com/access_token`,
+      `https://graph.instagram.com/oauth/access_token`,
       {
         params: {
           grant_type: "ig_exchange_token",
