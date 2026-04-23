@@ -874,16 +874,16 @@ router.get("/stats", auth, async (req, res) => {
 
 router.get("/connect-instagram", auth, (req, res) => {
   const scopes = [
-    "instagram_basic",
-    "instagram_manage_messages", 
-    "instagram_manage_comments",
+    "instagram_business_basic",
+    "instagram_business_manage_messages", 
+    "instagram_business_manage_comments",
   ].join(",");
 
   const redirectUri = `${process.env.BACKEND_URL}/api/instagram/callback-instagram`;
   const state = req.creator.id;
 
   const url =
-    `https://www.instagram.com/oauth/authorize` +  // ← changed from api.instagram.com
+    `https://www.instagram.com/oauth/authorize` +
     `?client_id=${process.env.INSTAGRAM_APP_ID}` +
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&scope=${encodeURIComponent(scopes)}` +
