@@ -915,8 +915,6 @@ router.get("/callback-instagram", async (req, res) => {
       })
     );
     const shortToken = tokenRes.data.access_token;
-    const igUserId = tokenRes.data.user_id;
-    
 
     // 2. Exchange for long-lived token
     const longTokenRes = await axios.get(
@@ -929,23 +927,21 @@ router.get("/callback-instagram", async (req, res) => {
         },
       }
     );
-    
     const longToken = longTokenRes.data.access_token;
     const expiresIn = longTokenRes.data.expires_in;
 
     // 3. Get IG account info
-    const igInfo = await axios.get(
-      `https://graph.instagram.com/v21.0/me`,  // ← Change from ${igUserId} to 'me'
-     {
-       params: {
-         fields: "id,username,name,profile_picture_url,followers_count",
-         access_token: longToken,
-       },
-     }
+    const igInfoRes = await axios.get(
+      `https://graph.instagram.com/v21.0/me`,
+      {
+        params: {
+          fields: "id,username,name,profile_picture_url,followers_count",
+          access_token: longToken,
+        },
+      }
     );
-    const ig = igInfo.data;
-    console.log(ig);
-    
+    const ig = igInfoRes.data;
+    console.log("✅ IG account:", ig);
 
     // 4. Check duplicate
     const existing = await pool.query(
@@ -962,7 +958,7 @@ router.get("/callback-instagram", async (req, res) => {
     // 5. Calculate expiry
     const expiresAt = new Date(Date.now() + (expiresIn || 5184000) * 1000);
 
-    // 6. Upsert into DB — note: no page_id for Instagram Login
+    // 6. Upsert into DB
     await pool.query(
       `INSERT INTO instagram_accounts
          (creator_id, ig_user_id, ig_username, ig_name, ig_profile_pic, ig_followers,
@@ -989,6 +985,23 @@ router.get("/callback-instagram", async (req, res) => {
         expiresAt,
       ]
     );
+
+    // 7. Subscribe webhook
+    try {
+      await axios.post(
+        `https://graph.instagram.com/v21.0/${ig.id}/subscriptions`,
+        null,
+        {
+          params: {
+            access_token: longToken,
+            subscribed_fields: 'messages,messaging_postbacks,comments',
+          }
+        }
+      );
+      console.log("✅ Webhook subscribed for", ig.username);
+    } catch (webhookErr) {
+      console.warn("Webhook subscription failed (non-fatal):", webhookErr.response?.data || webhookErr.message);
+    }
 
     res.redirect(`${process.env.FRONTEND_URL}/automations?connected=true`);
   } catch (err) {
