@@ -915,10 +915,12 @@ router.get("/callback-instagram", async (req, res) => {
       })
     );
     const shortToken = tokenRes.data.access_token;
+    const igUserId = tokenRes.data.user_id;
+    console.log("tokenRes",tokenRes.data);
 
-    // 2. Exchange for long-lived token ← correct endpoint for Business Login
+    // 2. Exchange for long-lived token
     const longTokenRes = await axios.get(
-      `https://graph.instagram.com/oauth/access_token`, // ← changed from /access_token
+      `https://graph.instagram.com/access_token`,
       {
         params: {
           grant_type: "ig_exchange_token",
@@ -927,21 +929,22 @@ router.get("/callback-instagram", async (req, res) => {
         },
       }
     );
+    console.log("longTokenRes", longTokenRes.data);
     const longToken = longTokenRes.data.access_token;
-    const expiresIn = longTokenRes.data.expires_in || 5184000;
+    const expiresIn = longTokenRes.data.expires_in;
 
     // 3. Get IG account info
-    const igInfoRes = await axios.get(
-      `https://graph.instagram.com/v21.0/me`,
-      {
-        params: {
-          fields: "id,username,name,profile_picture_url,followers_count",
-          access_token: longToken,
-        },
-      }
+    const igInfo = await axios.get(
+      `https://graph.instagram.com/v21.0/me`,  // ← Change from ${igUserId} to 'me'
+     {
+       params: {
+         fields: "id,username,name,profile_picture_url,followers_count",
+         access_token: longToken,
+       },
+     }
     );
-    const ig = igInfoRes.data;
-    console.log("✅ IG account:", ig);
+    const ig = igInfo.data;
+    console.log("igInfo", igInfo.data);
 
     // 4. Check duplicate
     const existing = await pool.query(
@@ -956,9 +959,9 @@ router.get("/callback-instagram", async (req, res) => {
     }
 
     // 5. Calculate expiry
-    const expiresAt = new Date(Date.now() + expiresIn * 1000);
+    const expiresAt = new Date(Date.now() + (expiresIn || 5184000) * 1000);
 
-    // 6. Upsert into DB
+    // 6. Upsert into DB — note: no page_id for Instagram Login
     await pool.query(
       `INSERT INTO instagram_accounts
          (creator_id, ig_user_id, ig_username, ig_name, ig_profile_pic, ig_followers,
@@ -994,5 +997,8 @@ router.get("/callback-instagram", async (req, res) => {
     );
   }
 });
+
+module.exports = router;
+
 
 module.exports = router;
