@@ -935,13 +935,13 @@ router.get("/callback-instagram", async (req, res) => {
 
     // 3. Get IG account info
     const igInfo = await axios.get(
-      `https://graph.instagram.com/v21.0/${igUserId}`,
-      {
-        params: {
-          fields: "id,username,name,profile_picture_url,followers_count",
-          access_token: longToken,
-        },
-      }
+      `https://graph.instagram.com/v21.0/me`,  // ← Change from ${igUserId} to 'me'
+     {
+       params: {
+         fields: "id,username,name,profile_picture_url,followers_count",
+         access_token: longToken,
+       },
+     }
     );
     const ig = igInfo.data;
     console.log("igInfo", igInfo.data);
