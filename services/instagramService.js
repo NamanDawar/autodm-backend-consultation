@@ -80,13 +80,13 @@ async function sendDMInstagram(igUserId, recipientId, messageText, accessToken) 
   return data;
 }
 
-async function sendComment(igAccountId, commentId, messageText, pageAccessToken) {
+async function sendComment(igAccountId, commentId, messageText, accessToken) {
   const { data } = await axios.post(
-    `${GRAPH}/${commentId}/replies`,
+    `${IG_GRAPH}/${commentId}/replies`,
     {
       message: messageText,
     },
-    { params: { access_token: pageAccessToken } }
+    { params: { access_token: accessToken } }
   );
   return data; // { id: reply_id }
 }
