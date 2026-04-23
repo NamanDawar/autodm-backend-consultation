@@ -938,7 +938,7 @@ router.get("/callback-instagram", async (req, res) => {
       `https://graph.instagram.com/v21.0/me`,  // ← Change from ${igUserId} to 'me'
      {
        params: {
-         fields: "id,username,name,profile_picture_url,followers_count",
+         fields: "id,user_id,username,name,profile_picture_url,followers_count",
          access_token: longToken,
        },
      }
