@@ -12,7 +12,7 @@ const {
   doesMessageMatch,
   buildResponseMessage,
   sendComment,
-  sendDMInstagram
+  sendDMInstagram,
 } = require("../services/instagramService");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -103,11 +103,11 @@ router.get("/callback", async (req, res) => {
     const existing = await pool.query(
       `SELECT creator_id FROM instagram_accounts 
        WHERE ig_user_id = $1 AND creator_id != $2 AND is_active = true`,
-      [igInfo.id, creatorId]
+      [igInfo.id, creatorId],
     );
     if (existing.rows.length > 0) {
       return res.redirect(
-        `${process.env.FRONTEND_URL}/automations?error=ig_already_connected`
+        `${process.env.FRONTEND_URL}/automations?error=ig_already_connected`,
       );
     }
 
@@ -467,11 +467,21 @@ async function processIncomingMessage(
         );
         console.log(`Comment reply sent`);
       }
-      if (account.login_type === 'instagram') {
-         await sendDMInstagram(account.ig_user_id, senderIgsid, response, account.access_token);
-     } else {
-        await sendDM(account.page_id, senderIgsid, response, account.access_token);
-     }
+      if (account.login_type === "instagram") {
+        await sendDMInstagram(
+          account.ig_user_id,
+          senderIgsid,
+          response,
+          account.access_token,
+        );
+      } else {
+        await sendDM(
+          account.page_id,
+          senderIgsid,
+          response,
+          account.access_token,
+        );
+      }
       // 10. Log outbound message
       await pool.query(
         `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, automation_id)
@@ -871,11 +881,10 @@ router.get("/stats", auth, async (req, res) => {
   }
 });
 
-
 router.get("/connect-instagram", auth, (req, res) => {
   const scopes = [
     "instagram_business_basic",
-    "instagram_business_manage_messages", 
+    "instagram_business_manage_messages",
     "instagram_business_manage_comments",
   ].join(",");
 
@@ -898,7 +907,7 @@ router.get("/callback-instagram", async (req, res) => {
 
   if (error || !code) {
     return res.redirect(
-      `${process.env.FRONTEND_URL}/automations?error=instagram_denied`
+      `${process.env.FRONTEND_URL}/automations?error=instagram_denied`,
     );
   }
 
@@ -912,11 +921,11 @@ router.get("/callback-instagram", async (req, res) => {
         grant_type: "authorization_code",
         redirect_uri: `${process.env.BACKEND_URL}/api/instagram/callback-instagram`,
         code,
-      })
+      }),
     );
     const shortToken = tokenRes.data.access_token;
     const igUserId = tokenRes.data.user_id;
-    console.log("tokenRes",tokenRes.data);
+    console.log("tokenRes", tokenRes.data);
 
     // 2. Exchange for long-lived token
     const longTokenRes = await axios.get(
@@ -927,7 +936,7 @@ router.get("/callback-instagram", async (req, res) => {
           client_secret: process.env.INSTAGRAM_APP_SECRET,
           access_token: shortToken,
         },
-      }
+      },
     );
     console.log("longTokenRes", longTokenRes.data);
     const longToken = longTokenRes.data.access_token;
@@ -935,13 +944,14 @@ router.get("/callback-instagram", async (req, res) => {
 
     // 3. Get IG account info
     const igInfo = await axios.get(
-      `https://graph.instagram.com/v21.0/me`,  // ← Change from ${igUserId} to 'me'
-     {
-       params: {
-         fields: "id,user_id,username,name,profile_picture_url,followers_count",
-         access_token: longToken,
-       },
-     }
+      `https://graph.instagram.com/v21.0/me`, // ← Change from ${igUserId} to 'me'
+      {
+        params: {
+          fields:
+            "id,user_id,username,name,profile_picture_url,followers_count",
+          access_token: longToken,
+        },
+      },
     );
     const ig = igInfo.data;
     console.log("igInfo", igInfo.data);
@@ -950,11 +960,11 @@ router.get("/callback-instagram", async (req, res) => {
     const existing = await pool.query(
       `SELECT creator_id FROM instagram_accounts 
        WHERE ig_user_id = $1 AND creator_id != $2 AND is_active = true`,
-      [ig.id, creatorId]
+      [ig.user_id, creatorId],
     );
     if (existing.rows.length > 0) {
       return res.redirect(
-        `${process.env.FRONTEND_URL}/automations?error=ig_already_connected`
+        `${process.env.FRONTEND_URL}/automations?error=ig_already_connected`,
       );
     }
 
@@ -986,19 +996,41 @@ router.get("/callback-instagram", async (req, res) => {
         ig.followers_count || 0,
         longToken,
         expiresAt,
-      ]
+      ],
     );
+
+    // 7. Subscribe the account to your App's webhooks
+    try {
+      await axios.post(
+        `https://graph.instagram.com/v21.0/${ig.user_id}/subscribed_apps`,
+        {
+          // These are the specific events your webhook needs to receive
+          subscribed_fields: "messages,comments,messaging_postbacks",
+        },
+        {
+          params: { access_token: longToken },
+        },
+      );
+      console.log(`✅ Webhook subscription successful for ${ig.username}`);
+    } catch (subErr) {
+      console.error(
+        "⚠️ Webhook subscription failed:",
+        subErr.response?.data || subErr.message,
+      );
+      // Optional: You might want to throw an error here if webhooks are critical
+    }
 
     res.redirect(`${process.env.FRONTEND_URL}/automations?connected=true`);
   } catch (err) {
-    console.error("Instagram callback error:", err.response?.data || err.message);
+    console.error(
+      "Instagram callback error:",
+      err.response?.data || err.message,
+    );
     res.redirect(
-      `${process.env.FRONTEND_URL}/automations?error=connect_failed`
+      `${process.env.FRONTEND_URL}/automations?error=connect_failed`,
     );
   }
 });
 
 module.exports = router;
 
-
-module.exports = router;
