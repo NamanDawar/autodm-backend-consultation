@@ -916,7 +916,7 @@ router.get("/callback-instagram", async (req, res) => {
     );
     const shortToken = tokenRes.data.access_token;
     const igUserId = tokenRes.data.user_id;
-    console.log("tokenRes",tokenRes.data);
+    
 
     // 2. Exchange for long-lived token
     const longTokenRes = await axios.get(
@@ -929,7 +929,7 @@ router.get("/callback-instagram", async (req, res) => {
         },
       }
     );
-    console.log("longTokenRes", longTokenRes.data);
+    
     const longToken = longTokenRes.data.access_token;
     const expiresIn = longTokenRes.data.expires_in;
 
@@ -944,7 +944,7 @@ router.get("/callback-instagram", async (req, res) => {
      }
     );
     const ig = igInfo.data;
-    console.log("igInfo", igInfo.data);
+    
 
     // 4. Check duplicate
     const existing = await pool.query(
