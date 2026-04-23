@@ -873,6 +873,8 @@ router.get("/stats", auth, async (req, res) => {
 
 
 router.get("/connect-instagram", auth, (req, res) => {
+  console.log("INSTAGRAM_APP_ID:", process.env.INSTAGRAM_APP_ID);
+  console.log("BACKEND_URL:", process.env.BACKEND_URL);
   const scopes = [
     "instagram_basic",
     "instagram_manage_messages", 
@@ -894,6 +896,8 @@ router.get("/connect-instagram", auth, (req, res) => {
 });
 
 router.get("/callback-instagram", async (req, res) => {
+  console.log("INSTAGRAM_APP_ID:", process.env.INSTAGRAM_APP_ID);
+  console.log("BACKEND_URL:", process.env.BACKEND_URL);
   const { code, state: creatorId, error } = req.query;
 
   if (error || !code) {
