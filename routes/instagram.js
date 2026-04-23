@@ -903,7 +903,7 @@ router.get("/callback-instagram", async (req, res) => {
   }
 
   try {
-    // 1. Exchange code for short-lived token
+    // 1. Exchange code for token
     const tokenRes = await axios.post(
       `https://api.instagram.com/oauth/access_token`,
       new URLSearchParams({
@@ -914,29 +914,16 @@ router.get("/callback-instagram", async (req, res) => {
         code,
       })
     );
-    const shortToken = tokenRes.data.access_token;
-   
+    console.log("tokenRes:", tokenRes.data);
+    const longToken = tokenRes.data.access_token; // ← use directly
+    const expiresIn = tokenRes.data.expires_in || 5184000;
 
-    // 2. Exchange for long-lived token
-    const longTokenRes = await axios.get(
-      `https://graph.instagram.com/access_token`,
-      {
-        params: {
-          grant_type: "ig_exchange_token",
-          client_secret: process.env.INSTAGRAM_APP_SECRET,
-          access_token: shortToken,
-        },
-      }
-    );
-    const longToken = longTokenRes.data.access_token;
-    const expiresIn = longTokenRes.data.expires_in;
-
-    // 3. Get IG account info
+    // 2. Get IG account info
     const igInfoRes = await axios.get(
       `https://graph.instagram.com/v21.0/me`,
       {
         params: {
-          fields: "id,username,name,profile_picture_url,followers_count",
+          fields: "id,username,name,profile_picture_url,followers_count,user_id",
           access_token: longToken,
         },
       }
@@ -944,7 +931,7 @@ router.get("/callback-instagram", async (req, res) => {
     const ig = igInfoRes.data;
     console.log("✅ IG account:", ig);
 
-    // 4. Check duplicate
+    // 3. Check duplicate
     const existing = await pool.query(
       `SELECT creator_id FROM instagram_accounts 
        WHERE ig_user_id = $1 AND creator_id != $2 AND is_active = true`,
@@ -956,10 +943,10 @@ router.get("/callback-instagram", async (req, res) => {
       );
     }
 
-    // 5. Calculate expiry
-    const expiresAt = new Date(Date.now() + (expiresIn || 5184000) * 1000);
+    // 4. Calculate expiry
+    const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
-    // 6. Upsert into DB
+    // 5. Upsert into DB
     await pool.query(
       `INSERT INTO instagram_accounts
          (creator_id, ig_user_id, ig_username, ig_name, ig_profile_pic, ig_followers,
@@ -986,23 +973,6 @@ router.get("/callback-instagram", async (req, res) => {
         expiresAt,
       ]
     );
-
-    // 7. Subscribe webhook
-    try {
-      await axios.post(
-        `https://graph.instagram.com/v21.0/${ig.id}/subscriptions`,
-        null,
-        {
-          params: {
-            access_token: longToken,
-            subscribed_fields: 'messages,messaging_postbacks,comments',
-          }
-        }
-      );
-      console.log("✅ Webhook subscribed for", ig.username);
-    } catch (webhookErr) {
-      console.warn("Webhook subscription failed (non-fatal):", webhookErr.response?.data || webhookErr.message);
-    }
 
     res.redirect(`${process.env.FRONTEND_URL}/automations?connected=true`);
   } catch (err) {
