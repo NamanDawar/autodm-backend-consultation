@@ -944,6 +944,7 @@ router.get("/callback-instagram", async (req, res) => {
      }
     );
     const ig = igInfo.data;
+    console.log(ig);
     
 
     // 4. Check duplicate
