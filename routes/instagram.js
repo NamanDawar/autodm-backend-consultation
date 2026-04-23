@@ -915,9 +915,7 @@ router.get("/callback-instagram", async (req, res) => {
       })
     );
     const shortToken = tokenRes.data.access_token;
-    console.log("tokenRes",tokenRes.data);
-    const igWebhookUserId = String(tokenRes.data.user_id); // ← webhook-compatible ID
-    console.log("igWebhookUserId:", igWebhookUserId);
+   
 
     // 2. Exchange for long-lived token
     const longTokenRes = await axios.get(
