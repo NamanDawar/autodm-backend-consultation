@@ -448,6 +448,12 @@ async function processIncomingMessage(
     ) {
       matched = true;
     } else if (
+      automation.trigger_type === "story_reply" &&
+      type === "story_reply"
+    ) {
+       matched = true; // no keyword matching for story replies — any reply triggers it
+     }
+     else if (
       automation.trigger_type === "comment_keyword" &&
       doesMessageMatch(
         messageText,
