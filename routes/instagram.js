@@ -349,13 +349,13 @@ async function processIncomingMessage(
   commenterUsername = null, // NEW
   postId = null
 ) {
-  if (type === "dm" && igMessageId) {
-    const exists = await pool.query(
-      `SELECT 1 FROM dm_messages WHERE ig_message_id = $1 LIMIT 1`,
-      [igMessageId],
-    );
-    if (exists.rows.length > 0) return;
-  }
+  // if (type === "dm" && igMessageId) {
+  //   const exists = await pool.query(
+  //     `SELECT 1 FROM dm_messages WHERE ig_message_id = $1 LIMIT 1`,
+  //     [igMessageId],
+  //   );
+  //   if (exists.rows.length > 0) return;
+  // }
   // } else if (type === "comment" && commentId) {
   //   const exists = await pool.query(
   //     `SELECT 1 FROM instagram_comments WHERE comment_id = $1 LIMIT 1`,
@@ -404,11 +404,18 @@ async function processIncomingMessage(
   const subscriberId = subResult.rows[0].id;
 
   // 3. Log inbound message
-  await pool.query(
-    `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, ig_message_id)
-     VALUES ($1, $2, $3, 'inbound', $4, $5)`,
+  const insertResult = await pool.query(
+   `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, ig_message_id)
+    VALUES ($1, $2, $3, 'inbound', $4, $5)
+    ON CONFLICT (ig_message_id) DO NOTHING
+    RETURNING id`,
     [creatorId, igAccountId, subscriberId, messageText, igMessageId],
   );
+  // If duplicate, skip everything
+  if (igMessageId && insertResult.rows.length === 0) {
+     console.log("⏭️ Duplicate detected, skipping");
+     return;
+  }
 
   // 4. Check if this is the first-ever DM from this sender
   const msgCount = await pool.query(
