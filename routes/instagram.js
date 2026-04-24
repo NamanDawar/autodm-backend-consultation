@@ -758,9 +758,9 @@ router.post("/automations", auth, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO dm_automations
-         (creator_id, ig_account_id, name, trigger_type, post_id,keywords, match_type,
+         (creator_id, ig_account_id, name, trigger_type, post_id, keywords, match_type,
           response_message, include_booking_link, delay_seconds)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
       [
         req.creator.id,
