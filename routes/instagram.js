@@ -1095,5 +1095,37 @@ router.get("/media", auth, async (req, res) => {
   }
 });
 
+router.get("/stories", auth, async (req, res) => {
+  try {
+    const acct = await pool.query(
+      `SELECT ig_user_id, access_token FROM instagram_accounts 
+       WHERE creator_id = $1 AND is_active = true LIMIT 1`,
+      [req.creator.id]
+    );
+    if (acct.rows.length === 0) {
+      return res.status(400).json({ error: "No connected Instagram account" });
+    }
+
+    const { ig_user_id, access_token } = acct.rows[0];
+
+    const { data } = await axios.get(
+      `https://graph.instagram.com/v21.0/${ig_user_id}/stories`,
+      {
+        params: {
+          fields: "id,media_url,thumbnail_url,media_type,timestamp",
+          access_token,
+        },
+      }
+    );
+
+    res.json({
+      stories: data.data || [],
+    });
+  } catch (err) {
+    console.error("Stories fetch error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to fetch stories" });
+  }
+});
+
 module.exports = router;
 
