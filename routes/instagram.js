@@ -216,12 +216,15 @@ router.post("/webhook", async (req, res) => {
       const recipientId = event.recipient?.id; // our IG Business User ID or Page ID
       const messageText = event.message?.text;
       const igMessageId = event.message?.mid;
+      const storyReply = event.message?.reply_to?.story; 
 
-      console.log(
-        `Message from ${senderIgsid} to ${recipientId}: "${messageText}"`,
-      );
+      const type = storyReply ? "story_reply" : "dm";
+      const postId = storyReply?.id || null;
+
+      console.log(`${type} from ${senderIgsid} to ${recipientId}: "${messageText}"`);
 
       if (!messageText || !senderIgsid) continue;
+
 
       try {
         await processIncomingMessage(
@@ -229,7 +232,11 @@ router.post("/webhook", async (req, res) => {
           senderIgsid,
           messageText,
           igMessageId,
-          "dm",
+          type,
+          null,
+          null,
+          postId
+
         );
       } catch (err) {
         console.error("Error processing webhook message:", err.message);
@@ -334,6 +341,7 @@ async function processIncomingMessage(
   type = "dm", // NEW: default to 'dm'
   commentId = null, // NEW
   commenterUsername = null, // NEW
+  postId = null
 ) {
   if (type === "dm" && igMessageId) {
     const exists = await pool.query(
@@ -403,11 +411,25 @@ async function processIncomingMessage(
   const isFirstDM = parseInt(msgCount.rows[0].count) <= 1;
 
   // 5. Find all active automations for this account
+  // const automations = await pool.query(
+  //   `SELECT * FROM dm_automations
+  //    WHERE ig_account_id = $1 AND is_active = true
+  //    ORDER BY created_at ASC`,
+  //   [igAccountId],
+  // );
+
   const automations = await pool.query(
-    `SELECT * FROM dm_automations
-     WHERE ig_account_id = $1 AND is_active = true
-     ORDER BY created_at ASC`,
-    [igAccountId],
+  `SELECT * FROM automations
+   WHERE ig_account_id = $1 AND is_active = true
+   AND (
+     (trigger_type = 'dm_keyword' AND $3 = 'dm')
+     OR (trigger_type = 'first_dm' AND $3 = 'dm')
+     OR (trigger_type = 'story_reply' AND $3 = 'story_reply' AND post_id = $2)
+     OR (trigger_type = 'comment_keyword' AND $3 = 'comment' AND  post_id = $2)
+   )
+   ORDER BY
+     created_at ASC`,
+  [igAccountId, postId, type]
   );
 
   // 6. Match automations and fire the first matching one
@@ -706,6 +728,7 @@ router.post("/automations", auth, async (req, res) => {
       response_message,
       include_booking_link = false,
       delay_seconds = 0,
+      post_id = null
     } = req.body;
 
     if (!name || !response_message) {
@@ -725,7 +748,7 @@ router.post("/automations", auth, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO dm_automations
-         (creator_id, ig_account_id, name, trigger_type, keywords, match_type,
+         (creator_id, ig_account_id, name, trigger_type, post_id,keywords, match_type,
           response_message, include_booking_link, delay_seconds)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
@@ -734,6 +757,7 @@ router.post("/automations", auth, async (req, res) => {
         acct.rows[0].id,
         name,
         trigger_type,
+        post_id,
         keywords,
         match_type,
         response_message,
