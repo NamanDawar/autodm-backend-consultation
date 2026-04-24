@@ -419,7 +419,7 @@ async function processIncomingMessage(
   // );
 
   const automations = await pool.query(
-  `SELECT * FROM automations
+  `SELECT * FROM dm_automations
    WHERE ig_account_id = $1 AND is_active = true
    AND (
      (trigger_type = 'dm_keyword' AND $3 = 'dm')

@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS dm_automations (
   -- 'comment_keyword' → triggers when a comment matches keywords (sends DM)
   -- 'first_dm'        → triggers on the very first DM from a new user
   -- 'story_reply'     → triggers when someone replies to a story
-  post_id VARCHAR(255),
+  post_id TEXT,
   keywords TEXT[] DEFAULT '{}',             -- e.g. ['book','booking','consult']
   match_type VARCHAR(20) DEFAULT 'contains',-- 'exact' | 'contains' | 'starts_with'
   response_message TEXT NOT NULL,
