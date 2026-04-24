@@ -250,7 +250,7 @@ router.post("/webhook", async (req, res) => {
       if (change.field === "comments" && change.value) {
         const recipientId = entry.id; // Page ID or IG Business User ID
         const commentData = change.value;
-        const postId = change.media.id;
+        const postId = change.value?.media?.id;
 
         console.log(
           `Comment from ${commentData.from.username}: "${commentData.text}"`,
