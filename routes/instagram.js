@@ -1155,5 +1155,38 @@ router.get("/stories", auth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/instagram/automations-by-post/:post_id
+ * Returns all automations for a specific post (story or comment automation)
+ */
+router.get("/automations-by-post/:post_id", auth, async (req, res) => {
+  try {
+    const { post_id } = req.params;
+
+    if (!post_id) {
+      return res.status(400).json({ error: "post_id is required" });
+    }
+
+    const result = await pool.query(
+      `SELECT a.*, ia.ig_username
+       FROM dm_automations a
+       JOIN instagram_accounts ia ON ia.id = a.ig_account_id
+       WHERE a.creator_id = $1 
+       AND a.post_id = $2
+       AND a.is_active = true
+       ORDER BY a.created_at DESC`,
+      [req.creator.id, post_id]
+    );
+
+    res.json({
+      post_id,
+      automations: result.rows,
+    });
+  } catch (err) {
+    console.error("Error fetching automations by post:", err.message);
+    res.status(500).json({ error: "Failed to fetch automations" });
+  }
+});
+
 module.exports = router;
 
