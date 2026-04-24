@@ -139,5 +139,5 @@ CREATE TABLE IF NOT EXISTS dm_messages (
   message_text TEXT,
   automation_id UUID REFERENCES dm_automations(id) ON DELETE SET NULL,
   sent_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(ig_message_id) WHERE ig_message_id IS NOT NULL
+  UNIQUE(ig_message_id) 
 );
