@@ -222,7 +222,7 @@ router.post("/webhook", async (req, res) => {
       let postId = null;
       if (storyReply?.url) {
           const url = new URL(storyReply.url);
-          postId = url.searchParams.get("asset_id"); // ← "17958541395116574"
+          postId = url.searchParams.get("asset_id"); 
       }
 
       console.log(`${type} from ${senderIgsid} to ${recipientId}: "${messageText}"`);
@@ -367,7 +367,8 @@ async function processIncomingMessage(
   let acctResult = await pool.query(
     `SELECT ia.*, c.page_slug FROM instagram_accounts ia
      JOIN creators c ON c.id = ia.creator_id
-     WHERE ia.ig_user_id = $1 AND ia.is_active = true`,
+     WHERE ia.ig_user_id = $1 AND ia.is_active = true
+     LIMIT 1`,
     [igBusinessUserId],
   );
   if (acctResult.rows.length === 0) {
@@ -375,7 +376,8 @@ async function processIncomingMessage(
     acctResult = await pool.query(
       `SELECT ia.*, c.page_slug FROM instagram_accounts ia
        JOIN creators c ON c.id = ia.creator_id
-       WHERE ia.page_id = $1 AND ia.is_active = true`,
+       WHERE ia.page_id = $1 AND ia.is_active = true
+       LIMIT 1`,
       [igBusinessUserId],
     );
   }
@@ -384,7 +386,7 @@ async function processIncomingMessage(
     return;
   }
 
-  const account = acctResult.rows[acctResult.rows.length - 1]; // In case of multiple, take the most recently created one
+  const account = acctResult.rows[0]; // In case of multiple, take the most recently created one
   const creatorId = account.creator_id;
   const igAccountId = account.id;
 
