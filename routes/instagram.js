@@ -440,6 +440,11 @@ async function processIncomingMessage(
   [igAccountId, postId, type]
   );
 
+  if(automations.rows.length === 0) {
+    console.log("⚠️ No active automations found");
+    return;
+  }
+
   // 6. Match automations and fire the first matching one
   for (const automation of automations.rows) {
     let matched = false;
