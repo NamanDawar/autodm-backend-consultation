@@ -219,7 +219,11 @@ router.post("/webhook", async (req, res) => {
       const storyReply = event.message?.reply_to?.story; 
 
       const type = storyReply ? "story_reply" : "dm";
-      const postId = storyReply?.id || null;
+      let postId = null;
+      if (storyReply?.url) {
+          const url = new URL(storyReply.url);
+          postId = url.searchParams.get("asset_id"); // ← "17958541395116574"
+      }
 
       console.log(`${type} from ${senderIgsid} to ${recipientId}: "${messageText}"`);
 
