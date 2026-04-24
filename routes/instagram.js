@@ -403,16 +403,18 @@ async function processIncomingMessage(
   );
   const subscriberId = subResult.rows[0].id;
 
+  const messageIdForDB = type === "comment" ? commentId : igMessageId;
+
   // 3. Log inbound message
   const insertResult = await pool.query(
    `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, ig_message_id)
     VALUES ($1, $2, $3, 'inbound', $4, $5)
     ON CONFLICT (ig_message_id) DO NOTHING
     RETURNING id`,
-    [creatorId, igAccountId, subscriberId, messageText, igMessageId],
+    [creatorId, igAccountId, subscriberId, messageText, messageIdForDB],
   );
   // If duplicate, skip everything
-  if (igMessageId && insertResult.rows.length === 0) {
+  if (messageIdForDB && insertResult.rows.length === 0) {
      console.log("⏭️ Duplicate detected, skipping");
      return;
   }
