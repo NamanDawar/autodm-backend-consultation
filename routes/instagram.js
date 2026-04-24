@@ -1032,5 +1032,44 @@ router.get("/callback-instagram", async (req, res) => {
   }
 });
 
+router.get("/media", auth, async (req, res) => {
+  try {
+    const { cursor } = req.query; // for pagination
+
+    const acct = await pool.query(
+      `SELECT ig_user_id, access_token FROM instagram_accounts 
+       WHERE creator_id = $1 AND is_active = true LIMIT 1`,
+      [req.creator.id]
+    );
+    if (acct.rows.length === 0) {
+      return res.status(400).json({ error: "No connected Instagram account" });
+    }
+
+    const { access_token } = acct.rows[0];
+
+    const params = {
+      fields: "id,caption,media_url,thumbnail_url,media_type,timestamp,permalink",
+      limit: 20,
+      access_token,
+    };
+
+    if (cursor) params.after = cursor;
+
+    const { data } = await axios.get(
+      `https://graph.instagram.com/v21.0/me/media`,
+      { params }
+    );
+
+    res.json({
+      posts: data.data || [],
+      next_cursor: data.paging?.cursors?.after || null,
+      has_more: !!data.paging?.next,
+    });
+  } catch (err) {
+    console.error("Media fetch error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to fetch media" });
+  }
+});
+
 module.exports = router;
 
