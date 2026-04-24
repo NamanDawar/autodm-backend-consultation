@@ -250,6 +250,7 @@ router.post("/webhook", async (req, res) => {
       if (change.field === "comments" && change.value) {
         const recipientId = entry.id; // Page ID or IG Business User ID
         const commentData = change.value;
+        const postId = change.media.id;
 
         console.log(
           `Comment from ${commentData.from.username}: "${commentData.text}"`,
@@ -264,6 +265,7 @@ router.post("/webhook", async (req, res) => {
             "comment",
             commentData.id,
             commentData.from.username,
+            postId
           );
         } catch (err) {
           console.error("Error processing webhook comment:", err.message);
