@@ -75,7 +75,12 @@ async function sendDMInstagram(igUserId, recipientId, messageText, accessToken) 
       recipient: { id: recipientId },
       message: { text: messageText },
     },
-    { params: { access_token: accessToken } }
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,  // ← Bearer token in header
+        'Content-Type': 'application/json'
+      }
+    }
   );
   return data;
 }
