@@ -1027,16 +1027,18 @@ router.get("/callback-instagram", async (req, res) => {
     const ig = igInfo.data;
     console.log("igInfo", igInfo.data);
 
-    // 4. Check duplicate
-    const existing = await pool.query(
-      `SELECT creator_id FROM instagram_accounts 
-       WHERE ig_user_id = $1 AND creator_id != $2 AND is_active = true`,
-      [ig.user_id, creatorId],
+    // Check if creator already has an ACTIVE account
+     const activeAccount = await pool.query(
+      `SELECT ig_user_id FROM instagram_accounts 
+       WHERE creator_id = $1 AND is_active = true LIMIT 1`,
+      [creatorId],
     );
-    if (existing.rows.length > 0) {
-      return res.redirect(
-        `${process.env.FRONTEND_URL}/automations?error=ig_already_connected`,
-      );
+    if (activeAccount.rows.length > 0) {
+      if (activeAccount.rows[0].ig_user_id !== ig.user_id) {
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/automations?error=already_connected`,
+        );
+      }
     }
 
     // 5. Calculate expiry
