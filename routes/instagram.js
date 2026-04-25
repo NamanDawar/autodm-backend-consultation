@@ -506,17 +506,24 @@ async function processIncomingMessage(
       await new Promise((r) => setTimeout(r, automation.delay_seconds * 1000));
     }
 
-    // 9. Send the DM via Meta API
-    try {
-      if (type === "comment") {
-        await sendComment(
+    if (type === "comment") {
+        try{
+          await sendComment(
           account.ig_user_id,
           commentId,
           response,
           account.access_token,
         );
         console.log(`Comment reply sent`);
+        } catch (error) {
+          console.error("Failed to send comment:",
+            error.response?.data || error.message,
+          );
+        }
       }
+
+   
+    try {
       if (account.login_type === "instagram") {
         await sendDMInstagram(
           account.ig_user_id,
@@ -532,13 +539,14 @@ async function processIncomingMessage(
           account.access_token,
         );
       }
-      // 10. Log outbound message
+      console.log(`✅ DM sent`);
+
       await pool.query(
         `INSERT INTO dm_messages (creator_id, ig_account_id, subscriber_id, direction, message_text, automation_id)
          VALUES ($1, $2, $3, 'outbound', $4, $5)`,
         [creatorId, igAccountId, subscriberId, response, automation.id],
       );
-      // 11. Increment trigger counter
+      
       await pool.query(
         `UPDATE dm_automations SET total_triggered = total_triggered + 1 WHERE id = $1`,
         [automation.id],
