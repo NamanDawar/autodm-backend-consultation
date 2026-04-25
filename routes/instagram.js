@@ -445,7 +445,7 @@ async function processIncomingMessage(
      OR (trigger_type = 'comment_keyword' AND $3 = 'comment' AND  post_id = $2)
    )
    ORDER BY
-     created_at ASC`,
+     created_at DESC`,
   [igAccountId, postId, type]
   );
 
