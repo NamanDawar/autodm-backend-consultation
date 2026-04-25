@@ -773,15 +773,6 @@ router.post("/automations", auth, async (req, res) => {
         .json({ error: "name and response_message are required" });
     }
 
-    if(post_id){
-      const post = await pool.query(
-        `SELECT id FROM dm_automations WHERE post_id = $1`,
-        [post_id]
-      );
-      if (post.rows.length > 0) {
-        return res.status(400).json({ error: "Automation for this post already exists" });
-      }
-    }
 
     // Get connected IG account
     const acct = await pool.query(
@@ -790,6 +781,16 @@ router.post("/automations", auth, async (req, res) => {
     );
     if (acct.rows.length === 0) {
       return res.status(400).json({ error: "No connected Instagram account" });
+    }
+
+    if(post_id){
+      const post = await pool.query(
+        `SELECT id FROM dm_automations WHERE post_id = $1`,
+        [post_id]
+      );
+      if (post.rows.length > 0) {
+        return res.status(400).json({ error: "Automation for this post already exists" });
+      }
     }
 
     const result = await pool.query(
