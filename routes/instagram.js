@@ -1184,13 +1184,14 @@ router.get("/automations-by-post/:post_id", auth, async (req, res) => {
        WHERE a.creator_id = $1 
        AND a.post_id = $2
        AND a.is_active = true
-       ORDER BY a.created_at DESC`,
+       ORDER BY a.created_at DESC
+       LIMIT 1`,
       [req.creator.id, post_id]
     );
 
     res.json({
       post_id,
-      automations: result.rows,
+      automation: result.rows[0] || null,
     });
   } catch (err) {
     console.error("Error fetching automations by post:", err.message);
