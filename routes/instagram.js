@@ -785,8 +785,8 @@ router.post("/automations", auth, async (req, res) => {
 
     if(post_id){
       const post = await pool.query(
-        `SELECT id FROM dm_automations WHERE post_id = $1`,
-        [post_id]
+       `SELECT id FROM dm_automations WHERE creator_id = $1 AND post_id = $2`,
+        [req.creator.id, post_id]
       );
       if (post.rows.length > 0) {
         return res.status(400).json({ error: "Automation for this post already exists" });
