@@ -84,11 +84,16 @@ async function sendComment(igAccountId, commentId, messageText, accessToken) {
   const { data } = await axios.post(
     `${IG_GRAPH}/${commentId}/replies`,
     {
-      message: messageText,
+      message: messageText,  // ← Body, not params
     },
-    { params: { access_token: accessToken } }
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,  // ← Bearer token in header
+        'Content-Type': 'application/json'
+      }
+    }
   );
-  return data; // { id: reply_id }
+  return data;
 }
 
 // ─── Webhook Management ────────────────────────────────────────────────────────
