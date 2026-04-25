@@ -1030,7 +1030,7 @@ router.get("/callback-instagram", async (req, res) => {
     // Check if creator already has an ACTIVE account
      const activeAccount = await pool.query(
       `SELECT ig_user_id FROM instagram_accounts 
-       WHERE creator_id = $1 AND is_active = true LIMIT 1`,
+       WHERE creator_id = $1 LIMIT 1`,
       [creatorId],
     );
     if (activeAccount.rows.length > 0) {
