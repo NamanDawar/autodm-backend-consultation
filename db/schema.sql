@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS dm_automations (
   keywords TEXT[] DEFAULT '{}',             -- e.g. ['book','booking','consult']
   match_type VARCHAR(20) DEFAULT 'contains',-- 'exact' | 'contains' | 'starts_with'
   response_message TEXT NOT NULL,
+  pdf_url TEXT,
   include_booking_link BOOLEAN DEFAULT false,
   delay_seconds INTEGER DEFAULT 0,           -- optional send delay
   is_active BOOLEAN DEFAULT true,

@@ -1,3 +1,8 @@
+const { Storage } = require('@google-cloud/storage');
+
+const storage = new Storage();
+const PDF_BUCKET = process.env.GCS_BUCKET_NAME;
+
 const axios = require('axios');
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
@@ -68,21 +73,36 @@ async function sendDM(pageId, recipientId, messageText, pageAccessToken) {
   return data; // { recipient_id, message_id }
 }
 
-async function sendDMInstagram(igUserId, recipientId, messageText, accessToken) {
-  const { data } = await axios.post(
-    `${IG_GRAPH}/${igUserId}/messages`,
-    {
-      recipient: { id: recipientId },
-      message: { text: messageText },
-    },
-    {
+async function sendDMInstagram(igUserId, recipientId, messageText, pdfUrl, accessToken) {
+  if(messageText?.trim()){
+     const { data } = await axios.post(
+     `${IG_GRAPH}/${igUserId}/messages`,
+      {
+       recipient: { id: recipientId },
+       message: { text: messageText },
+      },
+      {
+       headers: {
+         'Authorization': `Bearer ${accessToken}`,  // ← Bearer token in header
+         'Content-Type': 'application/json'
+       }
+     }
+   );
+  }
+  if(pdfUrl?.trim()){
+    const { data } = await axios.post(
+     `${IG_GRAPH}/${igUserId}/messages`,
+      { recipient: { id: recipientId }, 
+        message: { attachment: { type: 'file', payload: { url: pdfUrl } } } 
+      },
+      {
       headers: {
         'Authorization': `Bearer ${accessToken}`,  // ← Bearer token in header
         'Content-Type': 'application/json'
       }
     }
-  );
-  return data;
+   );
+  }
 }
 
 async function sendComment(igAccountId, commentId, messageText, accessToken) {
@@ -168,6 +188,22 @@ function buildResponseMessage(template, vars = {}) {
     .replace(/\{\{booking_link\}\}/gi, vars.booking_link || '');
 }
 
+async function generatePdfSignedUrl(filePath, bucketName) {
+  const targetBucket = bucketName || PDF_BUCKET;
+  const file = storage.bucket(targetBucket).file(filePath);
+
+  const [uploadUrl] = await file.getSignedUrl({
+    version: 'v4',
+    action: 'write',
+    expires: Date.now() + 5 * 60 * 1000,
+    contentType: 'application/pdf',
+  });
+
+  const publicUrl = `https://storage.googleapis.com/${targetBucket}/${filePath}`;
+  return { uploadUrl, publicUrl };
+}
+
+
 module.exports = {
   getLongLivedToken,
   getUserPages,
@@ -178,5 +214,6 @@ module.exports = {
   doesMessageMatch,
   buildResponseMessage,
   sendComment,
-  sendDMInstagram
+  sendDMInstagram,
+  generatePdfSignedUrl,
 };

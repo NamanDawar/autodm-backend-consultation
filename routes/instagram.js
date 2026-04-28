@@ -13,8 +13,9 @@ const {
   buildResponseMessage,
   sendComment,
   sendDMInstagram,
+  generatePdfSignedUrl
 } = require("../services/instagramService");
-
+const { v4: uuid } = require('uuid');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -512,6 +513,7 @@ async function processIncomingMessage(
           account.ig_user_id,
           commentId,
           response,
+          automation.pdf_url,
           account.access_token,
         );
         console.log(`Comment reply sent`);
@@ -764,7 +766,8 @@ router.post("/automations", auth, async (req, res) => {
       response_message,
       include_booking_link = false,
       delay_seconds = 0,
-      post_id = null
+      post_id = null,
+      pdf_url = null
     } = req.body;
 
     if (!name || !response_message) {
@@ -796,8 +799,8 @@ router.post("/automations", auth, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO dm_automations
          (creator_id, ig_account_id, name, trigger_type, post_id, keywords, match_type,
-          response_message, include_booking_link, delay_seconds)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          response_message, include_booking_link, delay_seconds, pdf_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
       [
         req.creator.id,
@@ -810,6 +813,7 @@ router.post("/automations", auth, async (req, res) => {
         response_message,
         include_booking_link,
         delay_seconds,
+        pdf_url
       ],
     );
     res.status(201).json(result.rows[0]);
@@ -830,13 +834,14 @@ router.put("/automations/:id", auth, async (req, res) => {
       response_message,
       include_booking_link,
       delay_seconds,
+      pdf_url
     } = req.body;
 
     const result = await pool.query(
       `UPDATE dm_automations
        SET name=$1, trigger_type=$2, keywords=$3, match_type=$4,
-           response_message=$5, include_booking_link=$6, delay_seconds=$7
-       WHERE id=$8 AND creator_id=$9
+           response_message=$5, include_booking_link=$6, delay_seconds=$7, pdf_url=$8   
+       WHERE id=$9 AND creator_id=$10
        RETURNING *`,
       [
         name,
@@ -846,6 +851,7 @@ router.put("/automations/:id", auth, async (req, res) => {
         response_message,
         include_booking_link,
         delay_seconds,
+        pdf_url,
         req.params.id,
         req.creator.id,
       ],
@@ -1207,6 +1213,22 @@ router.get("/automations-by-post/:post_id", auth, async (req, res) => {
   } catch (err) {
     console.error("Error fetching automations by post:", err.message);
     res.status(500).json({ error: "Failed to fetch automations" });
+  }
+});
+
+// GET /api/instagram/upload-url?filename=guide.pdf
+router.get('/upload-url', auth, async (req, res) => {
+  try {
+    const { filename } = req.query;
+    if (!filename || !filename.toLowerCase().endsWith('.pdf')) {
+      return res.status(400).json({ error: 'Only PDF files allowed' });
+    }
+    const filePath = `pdfs/${req.creator.id}/${uuid()}.pdf`;
+    const { uploadUrl, publicUrl } = await generatePdfSignedUrl(filePath);
+    res.json({ uploadUrl, publicUrl });
+  } catch (err) {
+    console.error('GCS signed URL error:', err.message);
+    res.status(500).json({ error: 'Failed to generate upload URL' });
   }
 });
 
